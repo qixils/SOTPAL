@@ -11,16 +11,18 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class GameData {
 	private static final Random RNG = new Random();
-	private final Map<Long, String> articleTitles = new Long2ObjectOpenHashMap<>();
+	private final Map<Long, String> articleTitles = new HashMap<>();
 	private final JDA jda;
 	private final long host;
 	private final long guild;
@@ -60,17 +62,19 @@ public final class GameData {
 
 	@NotNull
 	public RoundData newRound(byte players) {
-		if (players < articleTitles.size()) {
+		if (articleTitles.size() < players) {
 			throw new IllegalArgumentException("Not enough players have signed up for this game");
 		}
 		guessed = false;
 		List<Entry<Long, String>> randomPlayers = new ArrayList<>(articleTitles.entrySet());
 		Collections.shuffle(randomPlayers, RNG);
-		randomPlayers = randomPlayers.subList(0, Math.min(players, randomPlayers.size()));
+		if (players < randomPlayers.size())
+			randomPlayers = randomPlayers.subList(0, players);
 		Entry<Long, String> selection = randomPlayers.get(RNG.nextInt(randomPlayers.size()));
-		articleTitles.remove(selection.getKey(), selection.getValue());
 		Set<Long> playerIds = randomPlayers.stream().map(Entry::getKey).collect(Collectors.toUnmodifiableSet());
-		return roundData = new RoundData(jda, guild, selection.getKey(), selection.getValue(), playerIds);
+		roundData = new RoundData(jda, guild, selection.getKey(), selection.getValue(), playerIds);
+		articleTitles.remove(selection.getKey(), selection.getValue());
+		return roundData;
 	}
 
 	public boolean hasGuessed() {
@@ -81,5 +85,20 @@ public final class GameData {
 		if (guessed)
 			throw new IllegalStateException("Host has already guessed");
 		guessed = true;
+	}
+
+	public Set<Long> contestants() {
+		return Set.copyOf(articleTitles.keySet());
+	}
+
+	public void clearObsolete() {
+		Guild guildObj = jda.getGuildById(guild);
+		assert guildObj != null;
+		articleTitles.entrySet().removeIf(entry -> {
+			Member member = guildObj.getMemberById(entry.getKey());
+			if (member == null)
+				return true;
+			return !Objects.requireNonNull(member.getVoiceState()).inAudioChannel();
+		});
 	}
 }

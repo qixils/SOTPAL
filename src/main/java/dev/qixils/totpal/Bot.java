@@ -1,6 +1,5 @@
 package dev.qixils.totpal;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.Permission;
@@ -19,10 +18,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 public class Bot extends ListenerAdapter {
 	public static void main(String[] args) throws LoginException {
@@ -46,6 +48,47 @@ public class Bot extends ListenerAdapter {
 		}
 	}
 
+	private static <T> String commaJoinCollection(Collection<T> collection) {
+		return commaJoinCollection(collection, Objects::toString);
+	}
+
+	private static <T> String commaJoinCollection(Collection<T> collection, Function<T, String> mapper) {
+		if (collection.isEmpty())
+			throw new IllegalArgumentException("Collection should not be empty");
+		else if (collection.size() == 1) {
+			for (T item : collection)
+				return item.toString();
+			throw new IllegalArgumentException("Broken iterator; size returned 1 but no object was found");
+		} else if (collection.size() == 2) {
+			boolean obj1Found = false;
+			T obj1 = null;
+			T obj2 = null;
+			for (T item : collection) {
+				if (obj1Found) {
+					obj2 = item;
+				} else {
+					obj1 = item;
+					obj1Found = true;
+				}
+			}
+			return obj1 + " and " + obj2;
+		}
+
+		StringBuilder builder = new StringBuilder();
+		Iterator<T> iterator = collection.iterator();
+		while (iterator.hasNext()) {
+			T obj = iterator.next();
+			boolean hasNext = iterator.hasNext();
+			if (!hasNext) {
+				builder.append("and ");
+			}
+			builder.append(mapper.apply(obj));
+			if (hasNext)
+				builder.append(", ");
+		}
+		return builder.toString();
+	}
+
 	// real class
 
 	private static final Set<String> HOST_COMMANDS = Set.of(
@@ -55,19 +98,20 @@ public class Bot extends ListenerAdapter {
 			"guess"
 	);
 	private final JDA jda;
-	private final Map<Long, GameData> gameDataMap = new Long2ObjectOpenHashMap<>();
+	private final Map<Long, GameData> gameDataMap = new HashMap<>();
 
 	public Bot(String token) throws LoginException {
 		jda = JDABuilder.createDefault(token)
 				.setActivity(Activity.competing("Wikipedia"))
 				.addEventListeners(this)
 				.build();
+
 		jda.updateCommands().addCommands(
-				new CommandData("submit", "Enter in to a SOTPAL game by submitting a Wikipedia article title")
+				new CommandData("submit", "Enter in to a SOTPAL game by submitting a Wikipedia article subject")
 						.addOption(
 								OptionType.STRING,
 								"title",
-								"The title of a Wikipedia article",
+								"The subject of a Wikipedia article (the article title, minus clarifying parentheses)",
 								true
 						),
 
@@ -131,13 +175,10 @@ public class Bot extends ListenerAdapter {
 				event.reply("The game of SOTPAL has ended. Thank you all for playing!").queue();
 			}
 			case "article" -> {
-				GameData gameData = gameDataMap.get(guildId);
-				assert gameData != null; // should not be null per an earlier check
-				RoundData roundData = gameData.getRound();
-
+				RoundData roundData = gameDataMap.get(guildId).getRound();
 				final ReplyAction action;
 				if (roundData != null) {
-					action = event.reply("The current Wikipedia article title is **" + roundData.articleTitle() + "**");
+					action = event.reply("The current Wikipedia article is **" + roundData.articleTitle() + "**");
 				} else {
 					action = event.reply("A round has not yet started.");
 				}
@@ -145,27 +186,28 @@ public class Bot extends ListenerAdapter {
 				action.setEphemeral(true).queue();
 			}
 			case "submit" -> {
-				GameData gameData = gameDataMap.get(guildId);
-				assert gameData != null; // should not be null per an earlier check
-
 				if (!Objects.requireNonNull(event.getMember().getVoiceState()).inAudioChannel()) {
 					event.reply("You must be in a voice channel to use this command.").setEphemeral(true).queue();
 					return;
 				}
 				String title = Objects.requireNonNull(event.getOption("title")).getAsString();
-				gameData.updateArticle(memberId, title);
-				event.reply("Your Wikipedia article has been set as or updated to **" + title + "**").setEphemeral(true).queue();
+				if (title.startsWith("http://") || title.startsWith("https://")) {
+					event.reply("Your submission should be the title of a Wikipedia article, not its URL.").setEphemeral(true).queue();
+				} else {
+					gameDataMap.get(guildId).updateArticle(memberId, title);
+					String reply = "Your Wikipedia article has been set as or updated to **" + title + "**";
+					if (title.contains("(") || title.contains(")"))
+						reply = reply + "\n__**Warning:**__ It is generally not recommended to submit the part of article titles with parentheses.";
+					event.reply(reply).setEphemeral(true).queue();
+				}
 			}
 			case "clear" -> {
-				GameData gameData = gameDataMap.get(guildId);
-				assert gameData != null; // should not be null per an earlier check
-
-				gameData.clearArticles();
+				gameDataMap.get(guildId).clearArticles();
 				event.reply("All submitted Wikipedia articles have been cleared. Please re-enter them using `/submit`.").queue();
 			}
 			case "start" -> {
 				GameData gameData = gameDataMap.get(guildId);
-				assert gameData != null; // should not be null per an earlier check
+				gameData.clearObsolete();
 
 				byte players = (byte) Objects.requireNonNull(event.getOption("players")).getAsLong();
 				if (!gameData.canStartNewRound(players)) {
@@ -173,29 +215,17 @@ public class Bot extends ListenerAdapter {
 					return;
 				}
 				RoundData data = gameData.newRound(players);
-				StringBuilder message = new StringBuilder()
-						.append("A new round has started! Joining <@")
-						.append(memberId)
-						.append("> today is ");
-				Iterator<Long> idIterator = data.playerIds().iterator();
-				while (idIterator.hasNext()) {
-					long id = idIterator.next();
-					boolean hasNext = idIterator.hasNext();
-					if (!hasNext) {
-						message.append("and ");
-					}
-					message.append("<@").append(id).append(">");
-					if (hasNext)
-						message.append(", ");
-				}
-				message.append(". One of these people is going to be telling the truth about the contents of the Wikipedia article **")
-						.append(data.articleTitle())
-						.append("** while the others will be lying.");
-				event.reply(message.toString()).queue();
+				String message = "A new round has started! Joining <@" +
+						memberId +
+						"> today is " +
+						commaJoinCollection(data.playerIds(), id -> "<@" + id + ">") +
+						". One of these people is going to be telling the truth about the contents of the Wikipedia article **" +
+						data.articleTitle() +
+						"** while the others will be lying.";
+				event.reply(message).queue();
 			}
 			case "guess" -> {
 				GameData gameData = gameDataMap.get(guildId);
-				assert gameData != null; // should not be null per an earlier check
 				RoundData data = gameData.getRound();
 				if (data == null) {
 					event.reply("A round has not yet started.").setEphemeral(true).queue();
@@ -205,8 +235,13 @@ public class Bot extends ListenerAdapter {
 					event.reply("You have already guessed!").setEphemeral(true).queue();
 					return;
 				}
-
 				long guess = Objects.requireNonNull(event.getOption("user")).getAsLong();
+				if (!data.playerIds().contains(guess)) {
+					event.reply("That user is not participating in this round.").setEphemeral(true).queue();
+					return;
+				}
+				gameData.guess();
+
 				long truther = data.trutherId();
 				if (truther == guess) {
 					event.reply("Correct! That's a point to <@" + memberId
@@ -218,6 +253,14 @@ public class Bot extends ListenerAdapter {
 							+ ">.\nThe person telling the truth was ||<@" + truther + ">||.").queue();
 				}
 			}
+			case "entrants" -> {
+				Set<Long> contestants = gameDataMap.get(guildId).contestants();
+				event.reply("The entered contestants are "
+						+ commaJoinCollection(contestants, id -> "<@" + id + ">")
+						+ " (" + contestants.size() + " people)"
+				).setEphemeral(true).queue();
+			}
+			// TODO remove command
 		}
 	}
 }
