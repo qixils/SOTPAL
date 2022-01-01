@@ -4,12 +4,12 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyAction;
 import org.jetbrains.annotations.NotNull;
 
@@ -58,7 +58,10 @@ public class Bot extends ListenerAdapter {
 	private final Map<Long, GameData> gameDataMap = new Long2ObjectOpenHashMap<>();
 
 	public Bot(String token) throws LoginException {
-		jda = JDABuilder.createDefault(token).build();
+		jda = JDABuilder.createDefault(token)
+				.setActivity(Activity.competing("Wikipedia"))
+				.addEventListeners(this)
+				.build();
 		jda.updateCommands().addCommands(
 				new CommandData("submit", "Enter in to a SOTPAL game by submitting a Wikipedia article title")
 						.addOption(
