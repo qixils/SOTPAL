@@ -14,10 +14,9 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.security.auth.login.LoginException;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -30,20 +29,26 @@ public class Bot extends ListenerAdapter {
 	public static void main(String[] args) throws LoginException {
 		String token = args.length > 0
 				? args[0]
-				: getToken();
+				: getTokenFromFile();
+		if (token == null) {
+			System.out.println("A token must be supplied as a command-line argument or placed in the `token.txt` file in the working directory.");
+			System.exit(1);
+		}
 		new Bot(token);
 	}
 
-	private static String getToken() {
-		// this is dumb lmfao
-		// TODO: this doesn't work
-		try (InputStream stream = Bot.class.getResourceAsStream("token.txt")) {
-			try (InputStreamReader rawReader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-				try (BufferedReader reader = new BufferedReader(rawReader)) {
-					return reader.readLine();
+	private static String getTokenFromFile() {
+		File tokenFile = new File("token.txt");
+		if (!tokenFile.exists())
+			return null;
+		try {
+			try (FileReader fileReader = new FileReader(tokenFile)) {
+				try (BufferedReader bufferedReader = new BufferedReader(fileReader)) {
+					return bufferedReader.readLine();
 				}
 			}
 		} catch (IOException e) {
+			e.printStackTrace();
 			return null;
 		}
 	}
@@ -95,7 +100,8 @@ public class Bot extends ListenerAdapter {
 			"start",
 			"clear",
 			"end",
-			"guess"
+			"guess",
+			"remove"
 	);
 	private final JDA jda;
 	private final Map<Long, GameData> gameDataMap = new HashMap<>();
@@ -136,7 +142,9 @@ public class Bot extends ListenerAdapter {
 				new CommandData("open", "Opens a new game of SOTPAL"),
 				new CommandData("article", "Fetches the current SOTPAL article"),
 				new CommandData("clear", "Clears the entered SOTPAL articles"),
-				new CommandData("end", "Ends the SOTPAL game")
+				new CommandData("end", "Ends the SOTPAL game"),
+				new CommandData("remove", "Kick a user from the SOTPAL game"),
+				new CommandData("quit", "Retract your submission from the SOTPAL game")
 		).queue();
 	}
 
@@ -260,7 +268,12 @@ public class Bot extends ListenerAdapter {
 						+ " (" + contestants.size() + " people)"
 				).setEphemeral(true).queue();
 			}
-			// TODO remove command
+			case "remove" -> {
+				// todo
+			}
+			case "quit" -> {
+				// todo
+			}
 		}
 	}
 }
