@@ -1,6 +1,5 @@
 package dev.qixils.totpal;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.ISnowflake;
@@ -9,7 +8,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -100,5 +98,9 @@ public final class GameData {
 				return true;
 			return !Objects.requireNonNull(member.getVoiceState()).inAudioChannel();
 		});
+	}
+
+	public boolean remove(long user) {
+		return articleTitles.remove(user) != null;
 	}
 }

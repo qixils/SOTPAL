@@ -139,11 +139,18 @@ public class Bot extends ListenerAdapter {
 								true
 						),
 
+				new CommandData("remove", "Kick a user from the SOTPAL game")
+						.addOption(
+								OptionType.USER,
+								"user",
+								"The user to kick from the game",
+								true
+						),
+
 				new CommandData("open", "Opens a new game of SOTPAL"),
 				new CommandData("article", "Fetches the current SOTPAL article"),
 				new CommandData("clear", "Clears the entered SOTPAL articles"),
 				new CommandData("end", "Ends the SOTPAL game"),
-				new CommandData("remove", "Kick a user from the SOTPAL game"),
 				new CommandData("quit", "Retract your submission from the SOTPAL game")
 		).queue();
 	}
@@ -269,10 +276,19 @@ public class Bot extends ListenerAdapter {
 				).setEphemeral(true).queue();
 			}
 			case "remove" -> {
-				// todo
+				long target = Objects.requireNonNull(event.getOption("user")).getAsLong();
+				if (gameDataMap.get(guildId).remove(target))
+					event.reply("<@" + target + "> has been removed from the game.").queue();
+				else
+					event.reply("<@" + target + "> has not signed up to play.").setEphemeral(true).queue();
 			}
 			case "quit" -> {
-				// todo
+				String reply;
+				if (gameDataMap.get(guildId).remove(memberId))
+					reply = "You have retracted your submission from the game.";
+				else
+					reply = "You have not signed up to play.";
+				event.reply(reply).setEphemeral(true).queue();
 			}
 		}
 	}
