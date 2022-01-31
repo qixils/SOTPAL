@@ -1,8 +1,7 @@
 # SOTPAL
 
 Discord bot for playing games of Some Of These People Are Lying. Inspired
-by [Two Of These People Are Lying](https://www.youtube.com/playlist?list=PLfx61sxf1Yz2I-c7eMRk9wBUUDCJkU7H0)
-.
+by [Two Of These People Are Lying](https://www.youtube.com/playlist?list=PLfx61sxf1Yz2I-c7eMRk9wBUUDCJkU7H0).
 
 ## Usage
 
