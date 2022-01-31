@@ -6,7 +6,7 @@
 
     <groupId>dev.qixils.totpal</groupId>
     <artifactId>totpal-discord-bot</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -17,7 +17,7 @@
         <dependency>
             <groupId>net.dv8tion</groupId>
             <artifactId>JDA</artifactId>
-            <version>5.0.0-alpha.3</version>
+            <version>5.0.0-alpha.4</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
